@@ -174,7 +174,7 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 	}
 
 	if nextKey == "" {
-		runes := []rune(string(prevKey))
+		runes := []rune(prevKey)
 		n := len(runes)
 		for i := n - 1; i >= 0; i-- {
 			charToIncrement := runes[i]
@@ -187,15 +187,19 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 				return Key(runes), nil
 			}
 		}
-		return Key(string(prevKey) + string(g.characterSet.Min())), nil
+		// If the min character is used here, generating a key between prevKey and generated key will be impossible.
+		// For example, if prevKey was "000" and generated key was "0000", no key can be generated between them.
+		// If the generated key is "0001", a key between "000" and "0001" can be "00004".
+		nextToMin, ok := g.characterSet.Next(g.characterSet.Min())
+		if !ok {
+			return "", fmt.Errorf("next character of min character '%c' not found", g.characterSet.Min())
+		}
+		return Key(string(prevKey) + string(nextToMin)), nil
 	}
 
 	if prevKey == "" {
-		runes := []rune(string(nextKey))
+		runes := []rune(nextKey)
 		n := len(runes)
-		if n == 0 {
-			return "", fmt.Errorf("cannot generate key before an effectively empty nextKey string")
-		}
 		for i := n - 1; i >= 0; i-- {
 			charToDecrement := runes[i]
 			decrementedChar, ok := g.characterSet.Prev(charToDecrement)
@@ -235,29 +239,27 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 	}
 
 	if i == len(prevRunes) {
-		return Key(string(prevKey) + string(g.characterSet.Min())), nil
+		return prevKey + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
 	}
 
-	prevChar := prevRunes[i]
-	nextChar := nextRunes[i]
+	biggerChar := nextRunes[i]
+	for ; i < len(prevRunes); i++ {
+		prevChar := prevRunes[i]
+		next := g.characterSet.Mid(prevChar, biggerChar)
 
-	next := g.characterSet.Mid(prevChar, nextChar)
-
-	if next > prevChar && next < nextChar {
-		result := append(commonPrefix, next)
-		for j := i + 1; j < len(prevRunes); j++ {
-			result = append(result, g.characterSet.Min())
+		if next > prevChar && next < biggerChar {
+			result := append(commonPrefix[:i], next)
+			for j := i + 1; j < len(prevRunes); j++ {
+				result = append(result, g.characterSet.Min())
+			}
+			return Key(result), nil
 		}
-		return Key(result), nil
+
+		commonPrefix = append(commonPrefix, prevChar)
+		biggerChar = g.characterSet.Max()
 	}
 
-	incrementedPrev, err := g.Next(prevKey)
-	if err == nil && incrementedPrev < nextKey {
-		return incrementedPrev, nil
-	}
-
-	result := append(prevRunes, g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max()))
-	return Key(result), nil
+	return Key(prevRunes) + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
 }
 
 // Next generates a key that comes after the given key

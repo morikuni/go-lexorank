@@ -29,13 +29,15 @@ func TestGenerator(t *testing.T) {
 		{"555", "", "556"},
 		{"599", "", "600"},
 		{"", "701", "700"},
-		{"700", "701", "7004"},
-		{"700", "7004", "7002"},
-		{"7004", "701", "7005"},
-		{"7004", "7040", "7020"},
 		{"", "700", "699"},
 		{"699", "700", "6994"},
-		{"6994", "700", "6995"},
+		{"6994", "700", "6996"},
+		{"999", "", "9991"},
+		{"999", "9991", "99904"},
+		{"700", "701", "7004"},
+		{"700", "7004", "7002"},
+		{"7004", "701", "7006"},
+		{"7004", "7040", "7020"},
 	} {
 		t.Run(fmt.Sprintf("%s_%s", tt.prev, tt.next), func(t *testing.T) {
 			key, err := g.Between(tt.prev, tt.next)
@@ -44,6 +46,18 @@ func TestGenerator(t *testing.T) {
 			validateKey(t, key, tt.prev, tt.next)
 		})
 	}
+
+	t.Run("error on all min value", func(t *testing.T) {
+		key, err := g.Between("", "001")
+		noError(t, err)
+		equalKey(t, key, "000")
+		validateKey(t, key, "", "001")
+
+		key, err = g.Between("", "000")
+		if err == nil {
+			t.Fatalf("expected error, got %s", key)
+		}
+	})
 
 	t.Run("recursive", func(t *testing.T) {
 		var check func(prev, next Key, depth int)
