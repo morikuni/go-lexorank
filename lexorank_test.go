@@ -14,10 +14,10 @@ func TestNewASCIICharacterSet(t *testing.T) {
 }
 
 func TestGenerator(t *testing.T) {
-	charSet, err := NewASCIICharacterSet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+	charSet, err := NewASCIICharacterSet("0123456789")
 	noError(t, err)
 
-	g, err := NewGenerator(WithCharacterSet(charSet), WithInitial("aaa"))
+	g, err := NewGenerator(WithCharacterSet(charSet), WithInitial("555"))
 	noError(t, err)
 
 	for _, tt := range []struct {
@@ -25,17 +25,17 @@ func TestGenerator(t *testing.T) {
 		next Key
 		want Key
 	}{
-		{"", "", "aaa"},
-		{"aaa", "", "aab"},
-		{"azy", "", "azz"},
-		{"", "b01", "b00"},
-		{"b00", "b01", "b00U"},
-		{"b00", "b00U", "b00F"},
-		{"b00U", "b010", "b00V"},
-		{"b00U", "b040", "b020"},
-		{"", "b00", "azz"},
-		{"azz", "b00", "azzU"},
-		{"azzU", "b00", "azzV"},
+		{"", "", "555"},
+		{"555", "", "556"},
+		{"599", "", "600"},
+		{"", "701", "700"},
+		{"700", "701", "7004"},
+		{"700", "7004", "7002"},
+		{"7004", "701", "7005"},
+		{"7004", "7040", "7020"},
+		{"", "700", "699"},
+		{"699", "700", "6994"},
+		{"6994", "700", "6995"},
 	} {
 		t.Run(fmt.Sprintf("%s_%s", tt.prev, tt.next), func(t *testing.T) {
 			key, err := g.Between(tt.prev, tt.next)
