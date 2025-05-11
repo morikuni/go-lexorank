@@ -114,6 +114,8 @@ func main() {
 }
 ```
 
+## Try it out in the [Go Playground](https://go.dev/play/p/wIDGUfgrXhs?v=).
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
