@@ -70,19 +70,7 @@ func TestGenerator(t *testing.T) {
 	})
 
 	t.Run("recursive", func(t *testing.T) {
-		var check func(prev, next Key, depth int)
-		check = func(prev, next Key, depth int) {
-			if depth == 0 {
-				return
-			}
-			key, err := g.Between(prev, next)
-			noError(t, err)
-			validateKey(t, key, prev, next)
-			check(key, next, depth-1)
-			check(prev, key, depth-1)
-		}
-
-		check("", "", 20) // 2^N times tested
+		testRecursive(t, g, "", "", 20)
 	})
 
 	t.Run("keep generating key between target", func(t *testing.T) {
@@ -133,6 +121,17 @@ func validateKey(t *testing.T, got, prev, next Key) {
 	if next != "" && got >= next {
 		t.Fatalf("%s-%s key %s should be less than %s", prev, next, got, next)
 	}
+}
+
+func testRecursive(t *testing.T, g *Generator, prev, next Key, depth int) {
+	if depth == 0 {
+		return
+	}
+	key, err := g.Between(prev, next)
+	noError(t, err)
+	validateKey(t, key, prev, next)
+	testRecursive(t, g, key, next, depth-1)
+	testRecursive(t, g, prev, key, depth-1)
 }
 
 func TestBucket(t *testing.T) {
@@ -221,8 +220,6 @@ func FuzzGenerator_Between(f *testing.F) {
 			t.Skip("next key must not be the same as prev key")
 		}
 
-		key, err := g.Between(prevKey, nextKey)
-		noError(t, err)
-		validateKey(t, key, prevKey, nextKey)
+		testRecursive(t, g, prevKey, nextKey, 3)
 	})
 }
