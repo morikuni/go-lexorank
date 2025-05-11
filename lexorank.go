@@ -83,7 +83,8 @@ func (c *characterSet) Mid(a, b rune) rune {
 		indexB += len(c.runes)
 	}
 	midIndex := (indexA + indexB) / 2
-	return c.runes[midIndex]
+	index := midIndex % len(c.runes)
+	return c.runes[index]
 }
 
 func isASCII(r rune) bool {
@@ -262,24 +263,43 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		return prevKey + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
 	}
 
-	prefix := commonPrefix
 	for ; i < len(prevRunes); i++ {
 		prevChar := prevRunes[i]
 		nextChar := nextRunes[i]
 		next := g.characterSet.Mid(prevChar, nextChar)
 
 		if next > prevChar {
-			result := append(prefix[:i], next)
+			result := append(prevRunes[:i], next)
 			for j := i + 1; j < len(prevRunes); j++ {
 				result = append(result, g.characterSet.Min())
 			}
 			return Key(result), nil
 		}
-
-		prefix = append(prefix, prevChar)
+		if next < nextChar && runesGreaterThan(nextRunes[:i], prevRunes[:i]) {
+			result := append(nextRunes[:i], next)
+			for j := i + 1; j < len(prevRunes); j++ {
+				result = append(result, g.characterSet.Max())
+			}
+			return Key(result), nil
+		}
 	}
 
 	return Key(prevRunes) + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
+}
+
+func runesGreaterThan(a, b []rune) bool {
+	if len(a) != len(b) {
+		panic("runesGreaterThan: lengths of a and b must be equal")
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] > b[i] {
+			return true
+		}
+		if a[i] < b[i] {
+			return false
+		}
+	}
+	return false
 }
 
 // Next generates a key that comes after the given key.

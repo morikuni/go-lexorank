@@ -45,6 +45,9 @@ func TestGenerator(t *testing.T) {
 		{"0998", "1", "0999"},
 		{"088", "089", "0884"},
 		{"569", "570", "5694"},
+		{"569", "571", "570"},
+		{"569", "572", "570"},
+		{"569", "573", "571"},
 	} {
 		t.Run(fmt.Sprintf("%s_%s", tt.prev, tt.next), func(t *testing.T) {
 			key, err := g.Between(tt.prev, tt.next)
