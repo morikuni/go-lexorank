@@ -1,6 +1,7 @@
 package lexorank
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -18,8 +19,7 @@ func TestGenerator(t *testing.T) {
 	charSet, err := NewASCIICharacterSet("0123456789")
 	noError(t, err)
 
-	g, err := NewGenerator(WithCharacterSet(charSet), WithInitial("555"))
-	noError(t, err)
+	g := NewGenerator(WithCharacterSet(charSet), WithInitial("555"))
 
 	for _, tt := range []struct {
 		prev Key
@@ -118,6 +118,13 @@ func equalKey(t *testing.T, got, want Key) {
 	}
 }
 
+func equalBucketKey(t *testing.T, got, want BucketKey) {
+	t.Helper()
+	if want != got {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
 func validateKey(t *testing.T, got, prev, next Key) {
 	t.Helper()
 	if prev != "" && got <= prev {
@@ -128,6 +135,37 @@ func validateKey(t *testing.T, got, prev, next Key) {
 	}
 }
 
+func TestBucket(t *testing.T) {
+	charSet, err := NewASCIICharacterSet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+	noError(t, err)
+
+	g := NewGenerator(WithCharacterSet(charSet), WithInitial("555"))
+	bucket := NewBucket(WithGenerator(g))
+
+	for _, tt := range []struct {
+		prev BucketKey
+		next BucketKey
+		want BucketKey
+	}{
+		{"", "", "0|555"},
+		{"0|555", "", "0|556"},
+		{"", "1|555", "1|554"},
+	} {
+		t.Run(fmt.Sprintf("%s_%s", tt.prev, tt.next), func(t *testing.T) {
+			key, err := bucket.Between(tt.prev, tt.next)
+			noError(t, err)
+			equalBucketKey(t, key, tt.want)
+		})
+	}
+
+	t.Run("error on bucket mismatch", func(t *testing.T) {
+		_, err := bucket.Between("0|555", "1|555")
+		if !errors.Is(err, ErrBucketMismatch) {
+			t.Fatal("expected error, but got nil")
+		}
+	})
+}
+
 func FuzzGenerator_Between(f *testing.F) {
 	chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	charSet, err := NewASCIICharacterSet(chars)
@@ -135,10 +173,7 @@ func FuzzGenerator_Between(f *testing.F) {
 		f.Fatalf("failed to create character set: %v", err)
 	}
 
-	g, err := NewGenerator(WithCharacterSet(charSet))
-	if err != nil {
-		f.Fatalf("failed to create generator: %v", err)
-	}
+	g := NewGenerator(WithCharacterSet(charSet))
 
 	f.Add("", "")
 	f.Add("a", "")

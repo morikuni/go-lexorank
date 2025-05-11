@@ -1,6 +1,7 @@
 package lexorank
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -37,10 +38,10 @@ func NewASCIICharacterSet(set string) (CharacterSet, error) {
 	var runeToIndex [128]int
 	for i, r := range runes {
 		if !isASCII(r) {
-			return nil, fmt.Errorf("invalid character set: %c is not an ASCII character", r)
+			return nil, fmt.Errorf("invalid character set: '%c' is not an ASCII character", r)
 		}
 		if runeToIndex[r] != 0 {
-			return nil, fmt.Errorf("invalid character set: %c is duplicated", r)
+			return nil, fmt.Errorf("invalid character set: '%c' is duplicated", r)
 		}
 		runeToIndex[r] = i
 	}
@@ -101,7 +102,7 @@ func ValidateCharacterSet(set CharacterSet) error {
 			break
 		}
 		if r >= next {
-			return fmt.Errorf("invalid character set: %c >= %c", r, next)
+			return fmt.Errorf("invalid character set: '%c' >= '%c'", r, next)
 		}
 		r = next
 	}
@@ -112,7 +113,7 @@ func ValidateCharacterSet(set CharacterSet) error {
 			break
 		}
 		if r <= prev {
-			return fmt.Errorf("invalid character set: %c <= %c", r, prev)
+			return fmt.Errorf("invalid character set: '%c' <= '%c'", r, prev)
 		}
 		r = prev
 	}
@@ -126,28 +127,12 @@ func (k Key) String() string {
 	return string(k)
 }
 
-// WithBucket creates a BucketKey by associating this Key with a bucket name.
-func (k Key) WithBucket(bucket string) BucketKey {
-	return BucketKey{
-		bucket,
-		k,
-	}
-}
-
 // BucketKey represents a Key within a specific bucket namespace.
-type BucketKey struct {
-	bucket string
-	key    Key
-}
+type BucketKey string
 
 // String returns a string representation of the BucketKey in the format "bucket|key".
 func (k BucketKey) String() string {
-	return fmt.Sprintf("%s|%s", k.bucket, k.key)
-}
-
-// Key returns the Key part of this BucketKey.
-func (k BucketKey) Key() Key {
-	return k.key
+	return string(k)
 }
 
 // Generator is responsible for creating and managing lexicographically sortable keys.
@@ -173,7 +158,7 @@ func mustCharacterSet(set CharacterSet, err error) CharacterSet {
 }
 
 // NewGenerator creates a new Generator with the specified options.
-func NewGenerator(opts ...GeneratorOption) (*Generator, error) {
+func NewGenerator(opts ...GeneratorOption) *Generator {
 	g := &Generator{
 		DefaultCharacterSet,
 		"",
@@ -184,8 +169,7 @@ func NewGenerator(opts ...GeneratorOption) (*Generator, error) {
 	if g.initial == "" {
 		g.initial = defaultInitial(g.characterSet)
 	}
-	// No need to check if characters are in the character set
-	return g, nil
+	return g
 }
 
 // Between generates a key that comes between the prevKey and nextKey keys.
@@ -232,11 +216,11 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 				return Key(runes), nil
 			}
 		}
-		return "", fmt.Errorf("cannot generate key strictly before '%s' as it (or its prefix) consists of all min characters from the set", nextKey)
+		return "", fmt.Errorf("cannot generate key strictly before %q as it (or its prefix) consists of all min characters from the set", nextKey)
 	}
 
 	if prevKey > nextKey {
-		return "", fmt.Errorf("prevKey ('%s') must be strictly less than nextKey ('%s')", prevKey, nextKey)
+		return "", fmt.Errorf("prevKey (%q) must be strictly less than nextKey (%q)", prevKey, nextKey)
 	}
 
 	prevRunes := []rune(string(prevKey))
@@ -312,10 +296,10 @@ func (g *Generator) Prev(key Key) (Key, error) {
 	return g.Between("", key)
 }
 
-type option func(*Generator)
+type generatorOption func(*Generator)
 
-// GeneratorOption is a public alias for option, used to configure a Generator.
-type GeneratorOption option
+// GeneratorOption is a option for configuring the Generator.
+type GeneratorOption generatorOption
 
 // WithCharacterSet returns a GeneratorOption that sets the character set used by the Generator.
 func WithCharacterSet(set CharacterSet) GeneratorOption {
@@ -333,26 +317,99 @@ func WithInitial(initial string) GeneratorOption {
 
 // Bucket represents a namespace for keys, allowing separate key sequences in different buckets.
 type Bucket struct {
-	name      string
-	generator *Generator
+	defaultPrefix string
+	separator     rune
+	generator     *Generator
 }
 
 // NewBucket creates a new Bucket with the specified name and Generator.
-func NewBucket(name string, g *Generator) *Bucket {
-	return &Bucket{
-		name,
-		g,
+func NewBucket(opts ...BucketOption) *Bucket {
+	b := &Bucket{
+		"0",
+		'|',
+		nil,
 	}
+	for _, opt := range opts {
+		opt(b)
+	}
+	if b.generator == nil {
+		b.generator = NewGenerator()
+	}
+	return b
 }
 
 // Between generates a key that comes between the prev and next keys within this bucket.
 func (b *Bucket) Between(prev, next BucketKey) (BucketKey, error) {
-	k, err := b.generator.Between(prev.key, next.key)
-	if err != nil {
-		return BucketKey{}, err
+	var prefix string
+	var prevKey Key
+	if prev != "" {
+		prevBucket, key := b.SplitBucketKey(prev)
+		if prevBucket == "" {
+			return "", errors.New("prev key is not in format of bucket key")
+		}
+		prevKey = key
+		prefix = prevBucket
 	}
-	return BucketKey{
-		b.name,
-		k,
-	}, nil
+	var nextKey Key
+	if next != "" {
+		nextBucket, key := b.SplitBucketKey(next)
+		if nextBucket == "" {
+			return "", errors.New("next key is not in format of bucket key")
+		}
+		if prefix != "" && prefix != nextBucket {
+			return "", fmt.Errorf("%w: %q != %q", ErrBucketMismatch, prefix, nextBucket)
+		}
+		nextKey = key
+		prefix = nextBucket
+	}
+
+	k, err := b.generator.Between(prevKey, nextKey)
+	if err != nil {
+		return "", err
+	}
+	return b.createBucketKey(prefix, k), nil
+}
+
+var ErrBucketMismatch = errors.New("bucket mismatch")
+
+func (b *Bucket) SplitBucketKey(key BucketKey) (string, Key) {
+	parts := strings.SplitN(string(key), string(b.separator), 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], Key(parts[1])
+}
+
+func (b *Bucket) createBucketKey(bucket string, key Key) BucketKey {
+	if bucket == "" {
+		bucket = b.defaultPrefix
+	}
+	return BucketKey(fmt.Sprintf("%s%c%s", bucket, b.separator, key))
+}
+
+type bucketOption func(*Bucket)
+
+// BucketOption is a option for configuring the Bucket.
+type BucketOption bucketOption
+
+// WithSeparator returns a BucketOption that sets the separator of BucketKey.
+func WithSeparator(sep rune) BucketOption {
+	return func(g *Bucket) {
+		g.separator = sep
+	}
+}
+
+// WithGenerator returns a BucketOption that sets the Generator of Bucket.
+func WithGenerator(g *Generator) BucketOption {
+	return func(b *Bucket) {
+		b.generator = g
+	}
+}
+
+// WithDefaultPrefix returns a BucketOption that sets the default prefix of BucketKey.
+// The default prefix is only used for the initial key generation.
+func WithDefaultPrefix(prefix string) BucketOption {
+	return func(b *Bucket) {
+		b.defaultPrefix = prefix
+	}
 }
