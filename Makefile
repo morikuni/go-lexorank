@@ -1,10 +1,10 @@
 .PHONY: test
 test:
-	go test -v ./... -count 1
+	go test -v -count 1 ./...
 
 .PHONY: fuzz
 fuzz:
-	go test -fuzz . -fuzztime=1m ./...
+	go test -fuzz . -fuzztime=1m -v ./...
 
 .PHONY: lint
 lint:

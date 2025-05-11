@@ -197,7 +197,7 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		// If the generated key is "0001", a key between "000" and "0001" can be "00004".
 		nextToMin, ok := g.characterSet.Next(g.characterSet.Min())
 		if !ok {
-			return "", fmt.Errorf("next character of min character '%c' not found", g.characterSet.Min())
+			return "", fmt.Errorf("next character of min character '%c' not found: %q - %q", g.characterSet.Min(), prevKey, nextKey)
 		}
 		return Key(string(prevKey) + string(nextToMin)), nil
 	}
@@ -216,7 +216,7 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 				return Key(runes), nil
 			}
 		}
-		return "", fmt.Errorf("cannot generate key strictly before %q as it (or its prefix) consists of all min characters from the set", nextKey)
+		return "", fmt.Errorf("cannot generate key strictly before %q as it (or its prefix) consists of all min characters from the set: %q - %q", nextKey, prevKey, nextKey)
 	}
 
 	if prevKey > nextKey {

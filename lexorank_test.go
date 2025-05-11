@@ -190,33 +190,39 @@ func FuzzGenerator_Between(f *testing.F) {
 		}
 		return true
 	}
-	isSameKey := func(next, prev string) bool {
-		idx := strings.Index(next, prev)
-		if idx == -1 {
-			return false
-		}
-		for _, r := range next[len(prev):] {
+	allZeros := func(s string) bool {
+		for _, r := range s {
 			if r != '0' {
 				return false
 			}
 		}
 		return true
 	}
+	isSameKey := func(prev, next string) bool {
+		idx := strings.Index(next, prev)
+		if idx == -1 {
+			return false
+		}
+		if allZeros(next[idx+len(prev):]) {
+			return true
+		}
+		return false
+	}
 
 	f.Fuzz(func(t *testing.T, prev, next string) {
 		prevKey := Key(prev)
 		nextKey := Key(next)
 
-		if prev != "" && next != "" && prevKey >= nextKey {
+		if prevKey >= nextKey {
 			t.Skip("prev key must be less than next key")
-		}
-		if strings.HasPrefix(next, prev) {
-			t.Skip("next key must not start with prev key")
 		}
 		if !isValidCharInput(prev) || !isValidCharInput(next) {
 			t.Skip("keys must be in the character set")
 		}
-		if isSameKey(next, prev) {
+		if allZeros(prev) || allZeros(next) {
+			t.Skip("keys must not be all zeros")
+		}
+		if isSameKey(prev, next) {
 			t.Skip("next key must not be the same as prev key")
 		}
 
