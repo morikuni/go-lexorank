@@ -7,6 +7,7 @@ import (
 	"unicode"
 )
 
+// CharacterSet defines a set of characters that can be used for key generation.
 type CharacterSet interface {
 	Min() rune
 	Max() rune
@@ -29,6 +30,7 @@ type characterSet struct {
 	runeToIndex [128]int
 }
 
+// NewASCIICharacterSet creates a new CharacterSet from a string of ASCII characters.
 func NewASCIICharacterSet(set string) (CharacterSet, error) {
 	runes := []rune(set)
 	slices.Sort(runes)
@@ -88,6 +90,8 @@ func isASCII(r rune) bool {
 	return r >= 0 && r <= unicode.MaxASCII
 }
 
+// ValidateCharacterSet checks if the character set is valid by ensuring that
+// the characters are in ascending order and that there are no duplicates.
 func ValidateCharacterSet(set CharacterSet) error {
 	r := set.Min()
 	for {
@@ -114,12 +118,14 @@ func ValidateCharacterSet(set CharacterSet) error {
 	return nil
 }
 
+// Key represents a lexicographically sortable string key.
 type Key string
 
 func (k Key) String() string {
 	return string(k)
 }
 
+// WithBucket creates a BucketKey by associating this Key with a bucket name.
 func (k Key) WithBucket(bucket string) BucketKey {
 	return BucketKey{
 		bucket,
@@ -127,25 +133,30 @@ func (k Key) WithBucket(bucket string) BucketKey {
 	}
 }
 
+// BucketKey represents a Key within a specific bucket namespace.
 type BucketKey struct {
 	bucket string
 	key    Key
 }
 
+// String returns a string representation of the BucketKey in the format "bucket|key".
 func (k BucketKey) String() string {
 	return fmt.Sprintf("%s|%s", k.bucket, k.key)
 }
 
+// Key returns the Key part of this BucketKey.
 func (k BucketKey) Key() Key {
 	return k.key
 }
 
+// Generator is responsible for creating and managing lexicographically sortable keys.
 type Generator struct {
 	characterSet CharacterSet
 	initial      string
 }
 
 var (
+	// DefaultCharacterSet is the standard character set used for key generation.
 	DefaultCharacterSet = mustCharacterSet(NewASCIICharacterSet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"))
 )
 
@@ -160,6 +171,7 @@ func mustCharacterSet(set CharacterSet, err error) CharacterSet {
 	return set
 }
 
+// NewGenerator creates a new Generator with the specified options.
 func NewGenerator(opts ...GeneratorOption) (*Generator, error) {
 	g := &Generator{
 		DefaultCharacterSet,
@@ -175,6 +187,7 @@ func NewGenerator(opts ...GeneratorOption) (*Generator, error) {
 	return g, nil
 }
 
+// Between generates a key that comes between the prevKey and nextKey keys.
 func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 	if prevKey == "" && nextKey == "" {
 		return Key(g.initial), nil
@@ -269,36 +282,42 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 	return Key(prevRunes) + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
 }
 
-// Next generates a key that comes after the given key
+// Next generates a key that comes after the given key.
 func (g *Generator) Next(key Key) (Key, error) {
 	return g.Between(key, "")
 }
 
-// Prev generates a key that comes before the given key
+// Prev generates a key that comes before the given key.
 func (g *Generator) Prev(key Key) (Key, error) {
 	return g.Between("", key)
 }
 
 type option func(*Generator)
+
+// GeneratorOption is a public alias for option, used to configure a Generator.
 type GeneratorOption option
 
+// WithCharacterSet returns a GeneratorOption that sets the character set used by the Generator.
 func WithCharacterSet(set CharacterSet) GeneratorOption {
 	return func(g *Generator) {
 		g.characterSet = set
 	}
 }
 
+// WithInitial returns a GeneratorOption that sets the initial key value used by the Generator.
 func WithInitial(initial string) GeneratorOption {
 	return func(r *Generator) {
 		r.initial = initial
 	}
 }
 
+// Bucket represents a namespace for keys, allowing separate key sequences in different buckets.
 type Bucket struct {
 	name      string
 	generator *Generator
 }
 
+// NewBucket creates a new Bucket with the specified name and Generator.
 func NewBucket(name string, g *Generator) *Bucket {
 	return &Bucket{
 		name,
@@ -306,6 +325,7 @@ func NewBucket(name string, g *Generator) *Bucket {
 	}
 }
 
+// Between generates a key that comes between the prev and next keys within this bucket.
 func (b *Bucket) Between(prev, next BucketKey) (BucketKey, error) {
 	k, err := b.generator.Between(prev.key, next.key)
 	if err != nil {
