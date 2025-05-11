@@ -10,10 +10,17 @@ import (
 type CharacterSet interface {
 	Min() rune
 	Max() rune
-	// Next should return the next character in the set.
+	// Next should return a next character in the set.
 	Next(rune) (rune, bool)
-	// Prev should return the previous character in the set.
+	// Prev should return a previous character in the set.
 	Prev(rune) (rune, bool)
+	// Mid should return a character at the midpoint between a and b,
+	// treating the character set as a circular sequence.
+	// If b comes before a, it wraps around the end of the set.
+	//
+	// Examples of "0123456789":
+	// - Mid('2', '5') → '3' or '4' (2→3→4→5)
+	// - Mid('8', '2') → '0' (8→9→0→1→2)
 	Mid(rune, rune) rune
 }
 
@@ -70,8 +77,8 @@ func (c *characterSet) Prev(r rune) (rune, bool) {
 func (c *characterSet) Mid(a, b rune) rune {
 	indexA := c.runeToIndex[a]
 	indexB := c.runeToIndex[b]
-	if indexA == indexB {
-		return a
+	if indexB < indexA {
+		indexB += len(c.runes)
 	}
 	midIndex := (indexA + indexB) / 2
 	return c.runes[midIndex]
@@ -242,21 +249,21 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		return prevKey + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
 	}
 
-	biggerChar := nextRunes[i]
+	prefix := commonPrefix
 	for ; i < len(prevRunes); i++ {
 		prevChar := prevRunes[i]
-		next := g.characterSet.Mid(prevChar, biggerChar)
+		nextChar := nextRunes[i]
+		next := g.characterSet.Mid(prevChar, nextChar)
 
-		if next > prevChar && next < biggerChar {
-			result := append(commonPrefix[:i], next)
+		if next > prevChar {
+			result := append(prefix[:i], next)
 			for j := i + 1; j < len(prevRunes); j++ {
 				result = append(result, g.characterSet.Min())
 			}
 			return Key(result), nil
 		}
 
-		commonPrefix = append(commonPrefix, prevChar)
-		biggerChar = g.characterSet.Max()
+		prefix = append(prefix, prevChar)
 	}
 
 	return Key(prevRunes) + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil

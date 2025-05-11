@@ -2,6 +2,7 @@ package lexorank
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -31,13 +32,19 @@ func TestGenerator(t *testing.T) {
 		{"", "701", "700"},
 		{"", "700", "699"},
 		{"699", "700", "6994"},
-		{"6994", "700", "6996"},
+		{"6994", "700", "6997"},
 		{"999", "", "9991"},
 		{"999", "9991", "99904"},
 		{"700", "701", "7004"},
 		{"700", "7004", "7002"},
-		{"7004", "701", "7006"},
+		{"7004", "701", "7007"},
 		{"7004", "7040", "7020"},
+		{"079", "1", "080"},
+		{"08", "1", "09"},
+		{"098", "1", "099"},
+		{"0998", "1", "0999"},
+		{"088", "089", "0884"},
+		{"569", "570", "5694"},
 	} {
 		t.Run(fmt.Sprintf("%s_%s", tt.prev, tt.next), func(t *testing.T) {
 			key, err := g.Between(tt.prev, tt.next)
@@ -73,6 +80,25 @@ func TestGenerator(t *testing.T) {
 		}
 
 		check("", "", 20) // 2^N times tested
+	})
+
+	t.Run("keep generating key between target", func(t *testing.T) {
+		var keep Key
+		for i := 0; i < 9999; i++ {
+			key, err := g.Between(keep, "1")
+			noError(t, err)
+			validateKey(t, key, keep, "1")
+			keep = key
+		}
+		t.Logf("last key: %s", keep)
+		keep = ""
+		for i := 0; i < 9999; i++ {
+			key, err := g.Between("0", keep)
+			noError(t, err)
+			validateKey(t, key, "0", keep)
+			keep = key
+		}
+		t.Logf("last key: %s", keep)
 	})
 }
 
