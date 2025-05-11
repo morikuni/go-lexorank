@@ -236,20 +236,11 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		}
 	}
 
-	var commonPrefix []rune
-	i := 0
-	for i < len(prevRunes) && i < len(nextRunes) && prevRunes[i] == nextRunes[i] {
-		commonPrefix = append(commonPrefix, prevRunes[i])
-		i++
-	}
-
-	if i == len(prevRunes) {
-		return prevKey + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
-	}
-
-	for ; i < len(prevRunes); i++ {
-		prevChar := prevRunes[i]
+	for i, prevChar := range prevRunes {
 		nextChar := nextRunes[i]
+		if prevChar == nextChar {
+			continue
+		}
 		next := g.characterSet.Mid(prevChar, nextChar)
 
 		if next > prevChar {
