@@ -98,3 +98,67 @@ func validateKey(t *testing.T, got, prev, next Key) {
 		t.Fatalf("%s-%s key %s should be less than %s", prev, next, got, next)
 	}
 }
+
+func FuzzGenerator_Between(f *testing.F) {
+	chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	charSet, err := NewASCIICharacterSet(chars)
+	if err != nil {
+		f.Fatalf("failed to create character set: %v", err)
+	}
+
+	g, err := NewGenerator(WithCharacterSet(charSet))
+	if err != nil {
+		f.Fatalf("failed to create generator: %v", err)
+	}
+
+	f.Add("", "")
+	f.Add("a", "")
+	f.Add("", "z")
+	f.Add("a", "z")
+	f.Add("abc", "def")
+	f.Add("AAA", "AAA1")
+	f.Add("YZZ0", "Z00")
+
+	isValidCharInput := func(s string) bool {
+		for _, r := range s {
+			if !strings.ContainsRune(chars, r) {
+				return false
+			}
+		}
+		return true
+	}
+	isSameKey := func(next, prev string) bool {
+		idx := strings.Index(next, prev)
+		if idx == -1 {
+			return false
+		}
+		for _, r := range next[len(prev):] {
+			if r != '0' {
+				return false
+			}
+		}
+		return true
+	}
+
+	f.Fuzz(func(t *testing.T, prev, next string) {
+		prevKey := Key(prev)
+		nextKey := Key(next)
+
+		if prev != "" && next != "" && prevKey >= nextKey {
+			t.Skip("prev key must be less than next key")
+		}
+		if strings.HasPrefix(next, prev) {
+			t.Skip("next key must not start with prev key")
+		}
+		if !isValidCharInput(prev) || !isValidCharInput(next) {
+			t.Skip("keys must be in the character set")
+		}
+		if isSameKey(next, prev) {
+			t.Skip("next key must not be the same as prev key")
+		}
+
+		key, err := g.Between(prevKey, nextKey)
+		noError(t, err)
+		validateKey(t, key, prevKey, nextKey)
+	})
+}
