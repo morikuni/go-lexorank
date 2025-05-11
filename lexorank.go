@@ -236,6 +236,7 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		}
 	}
 
+	mid := g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())
 	for i, prevChar := range prevRunes {
 		nextChar := nextRunes[i]
 		if prevChar == nextChar {
@@ -245,7 +246,6 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 
 		if next > prevChar {
 			result := append(prevRunes[:i], next)
-			mid := g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())
 			for j := i + 1; j < len(prevRunes); j++ {
 				result = append(result, mid)
 			}
@@ -253,7 +253,6 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		}
 		if next < nextChar && runesGreaterThan(nextRunes[:i], prevRunes[:i]) {
 			result := append(nextRunes[:i], next)
-			mid := g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())
 			for j := i + 1; j < len(prevRunes); j++ {
 				result = append(result, mid)
 			}
@@ -261,7 +260,7 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 		}
 	}
 
-	return Key(prevRunes) + Key(g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())), nil
+	return Key(prevRunes) + Key(mid), nil
 }
 
 func runesGreaterThan(a, b []rune) bool {
