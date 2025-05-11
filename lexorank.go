@@ -288,6 +288,11 @@ func (g *Generator) Prev(key Key) (Key, error) {
 	return g.Between("", key)
 }
 
+// Initial generates the initial key for this generator.
+func (g *Generator) Initial() (Key, error) {
+	return g.Between("", "")
+}
+
 type generatorOption func(*Generator)
 
 // GeneratorOption is a option for configuring the Generator.
@@ -360,6 +365,21 @@ func (b *Bucket) Between(prev, next BucketKey) (BucketKey, error) {
 		return "", err
 	}
 	return b.createBucketKey(prefix, k), nil
+}
+
+// Next generates a key that comes after the given key.
+func (b *Bucket) Next(key BucketKey) (BucketKey, error) {
+	return b.Between(key, "")
+}
+
+// Prev generates a key that comes before the given key.
+func (b *Bucket) Prev(key BucketKey) (BucketKey, error) {
+	return b.Between("", key)
+}
+
+// Initial generates the initial key for this bucket.
+func (b *Bucket) Initial() (BucketKey, error) {
+	return b.Between("", "")
 }
 
 var ErrBucketMismatch = errors.New("bucket mismatch")
