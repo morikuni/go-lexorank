@@ -245,15 +245,17 @@ func (g *Generator) Between(prevKey, nextKey Key) (Key, error) {
 
 		if next > prevChar {
 			result := append(prevRunes[:i], next)
+			mid := g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())
 			for j := i + 1; j < len(prevRunes); j++ {
-				result = append(result, g.characterSet.Min())
+				result = append(result, mid)
 			}
 			return Key(result), nil
 		}
 		if next < nextChar && runesGreaterThan(nextRunes[:i], prevRunes[:i]) {
 			result := append(nextRunes[:i], next)
+			mid := g.characterSet.Mid(g.characterSet.Min(), g.characterSet.Max())
 			for j := i + 1; j < len(prevRunes); j++ {
-				result = append(result, g.characterSet.Max())
+				result = append(result, mid)
 			}
 			return Key(result), nil
 		}
